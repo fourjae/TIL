@@ -57,3 +57,32 @@ public void send(String email, String title, String content){
     this.content = content;
 }
 ```
+
+
+### 도메인과 영속성 객체 구분하기
+
+- Domain Entity, Jpa Entity를 분리한다.
+
+- Repository에서 사용중인 JpaEntity -> DomainEntity로 변경
+
+- RepositoryImpl에서 사용중인 JpaEntity -> DomainEntity로 변경
+
+- RepositoryImpl에서 JpaEntity -> DomainEntity로 바꿔주는 메서드 생성
+
+    - JpaEntity에 DomainEntity 객체를 반환해주는 toModel() builder 객체 생성
+
+    - JpaEntity에 JpaEntity 객체를 반환해주는 fromModel() 객체 생성
+
+        - (Domain은 Infrastructure Layer를 모르는 것이 좋음)
+
+    - userJpaRepository.findById(id).map(JpaEntiy::toModel);
+
+- Service에서 JpaEntity -> DomainEntity로 변경
+
+    - DomainEntity가 책임을 가지고 있어야 할 경우 객체로 부터 받은 값을 DomainEntity로 변경해주는 from builder 객체 생성
+
+- JpaRepository.findById() 이후 DomainEntity로 값 변환시 jpa가 변경된 엔티티를 감지하고 수정하지 못하여 JpaRpoeisotry.save 필요함
+
+- Controller에서 JpaEntity -> DomainEntity로 변경
+
+- Controller가 들고있는 부자연스러운 DomainEntity -> Response로 변환해주는 객체는 응답객체에 builder() 객체 생성하여 위임
