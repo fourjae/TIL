@@ -86,3 +86,73 @@ public void send(String email, String title, String content){
 - Controller에서 JpaEntity -> DomainEntity로 변경
 
 - Controller가 들고있는 부자연스러운 DomainEntity -> Response로 변환해주는 객체는 응답객체에 builder() 객체 생성하여 위임
+
+### 도메인에 테스트 추가하기
+
+```
+Mock (**FakeMailSender** implements MailSender)
+```Java
+@Test
+public class PostCreate() {
+    // given
+    PostCreate postCreate = PostCreate.builder()
+        .writeId(1)
+        .content("helloWorld")
+        .build();
+
+    User user = User.Builder()
+        .email("test@naver.com")
+        .nickname("tester")
+        .address("Seoul Gangnam")
+        .status(UserStatus.PENDING)
+        .certificationCode("certificationCodeForTest")
+        .build();
+
+    // when
+    Post post = post.from(user, postCreate);
+
+    // then
+    assertThat(post.getContent()).isEqualTo("helloWorld");
+    assertThat(post.certificationCode()).isEqualTo("certificationCodeForTest");
+}
+```
+
+UUID.randomUUID().toString() 값을 테스트 하려면?
+
+- UuIdHolder interface를 생성한다. (의존성 역전)
+
+- infrastructure에 구현체를 만든다.  
+
+    -   ```Java
+        public class SystemUuidHolder implements UuidHolder {
+
+            @Override
+            public String random(){
+                return UUID.randomUUID().toString();   
+            }
+        }
+        ```
+- 이제 외부에서 주입받도록 한다.
+
+    -   ```Java
+        public static User from(UuidHolder uuidHolder){
+            return User.builder().
+                .certificationCode(uuidHolder.random())
+                .build();
+        }
+        ```
+
+- 마찬가지로 TestUuidHolder 클래스를 생성하여 UuIdHolder를 구현한다.
+
+    -   ```Java
+            @RequiredArgsConstructor
+            public class TestUuidHolder implements UuidHolder {
+                private final String uuid;
+
+                @Override
+                public String random() {
+                    return uuid;
+                }
+
+            }
+        ```
