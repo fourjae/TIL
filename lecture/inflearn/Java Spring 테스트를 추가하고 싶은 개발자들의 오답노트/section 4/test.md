@@ -246,3 +246,117 @@ h2나 mockito 없이 서비스 테스트를 소형 테스트로 만드는 작업
 자바가 아니어도 테스트 라이브러리 없이 테스트가 가능하게 될 것이다.
 
 이렇게 변경할 수 있었던 이유는 의존성 역전, 의존성 주입을 통해 설계가 개선되었기 떄문이다.
+
+### 컨트롤러를 소형 테스트로 만들기
+
+- controller 패키지에 접근할 계층(service)의 port/interface 추가
+
+- 기존 Service들이 interface를 상속받게 변경 이후 interface에 메서드 선언
+
+- 서비스 구현체에 의존하던 코드를 추상화에 의존하도록 생성자 주입 객체 변경
+    
+    - Controller , Service
+
+- Service interface 분리 후 여러 interface에 의존하도록 한다. (ISP)
+
+    - 각 메서드별로 행위 객체를 분리
+
+    - UserService -> UserCreateService, UserReadService, UserUpdateService, AuthenticationService 등
+
+    - 이후 테스트 코드에서는 필요한 인터페이스만 구현하여 테스트 가능
+
+```Java
+public class UserControllerTest() {
+    @Test
+    void Controller_유저_호출_테스트() throws Exception {
+        // given
+        UserController userController = UserController.builder()
+        .userReadSErvice(new UserReadService() {
+            @Override
+            public User getByEmail(String email) {
+                return null;
+            }
+            @Override
+            public User getById(long id) {
+                return User.builder()
+                    .id(id)
+                    .email("test@naver.com")
+                    // 생략
+                    .build()
+            }
+        })
+
+        //when
+        ResponseEntity<UserResponse> result = userController.getById(1);
+
+        //then
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatusCode.valueOf(200));
+        assertThat(result.getBody()).isNotNull();
+        assertThat(result.getEmail()).isEqualTo("test@naver.com");
+    }
+}
+```
+
+- 그러나, 위는 stub을 하는 코드이므로 구현을 강제함
+
+- 위 코드 대신 스프링의 IoC 컨테이너를 흉내내는 TestContainer를 만든다.
+
+```Java
+public class TestContainer {
+    public final MailSender mailSender;
+    public final UserRepository userRepository;
+    public final UserReadService userReadService;
+    //UserCreate,Update,Authentication 등의 Service 선언
+    
+    private final CertificationService certificationService;
+    private final UserController userController;
+
+    @Builder
+    public TestContainer(UuidHolder uuidHolder, ClockHolder clockHolder) {
+        this.mailSender = new FakeMailSender();
+        this.userRepository = new FakeUserRepository();
+        this.certificationService = new CertificationService
+        this.userService = UserServiceImpl.builder()
+            .uuidHolder(uuidHolder)
+            .clockHolder(clockHolder)
+            .userRepository(this.userRepository)
+            .certificationService(this.certificationService)
+            .build();
+        this.userReadService = userService;
+        //UserCreate,Update,Authentication 등에 userService 주입
+        this.userController = UserController.builder()
+            //UserCreate,Update,Authentication 등 builder 생성
+            .build();
+    }
+}
+```
+
+```Java
+public class UserControllerTest() {
+    @Test
+    void Controller_Test() throws Exception {
+        // given
+        TestContainer testContainer = TestContainer.builder()
+        .build();
+        User user = User.Builder()
+            .email("test@naver.com")
+            .nickname("tester")
+            .address("Seoul Gangnam")
+            .status(UserStatus.PENDING)
+            .certificationCode("certification-Code-For-Test")
+            .build();
+        testContainer.userRepository.save(user);
+
+        // when
+        ResponseEntity<UserResponse> result = UserController.builder()
+            .userReadService(testContainer.userReadService)
+            .build()
+            .getById(1);
+
+        // then
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatusCode.valueOf(200));
+        assertThat(result.getBody()).isNotNull();
+        assertThat(result.getBody().getEmail()).isEqualTo("test@naver.com");
+    }
+}
+```
