@@ -360,3 +360,20 @@ public class UserControllerTest() {
     }
 }
 ```
+
+### 마지막 리팩토링
+
+- 여러(create,update,authentication) interface를 다시 하나의 interface로 통합
+
+    - 이에 따라, 다중 interface를 하나의 interface로 변경, 및 생성자 주입 코드 간소화
+
+- Controller에 DomainDTO가 노출 되지 않게 RequestDTO 생성
+
+    - RequestDTO -> DomainDTO로 반환하는 메서드 생성 가능
+    ```Java
+        public UserUpdate to() {
+            return UserUpdate.builder()
+                // 생략
+                .build()
+        }
+    ```
